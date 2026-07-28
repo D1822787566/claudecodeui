@@ -202,9 +202,11 @@ function mapCliOptionsToSDK(options = {}) {
 
   sdkOptions.disallowedTools = settings.disallowedTools || [];
 
-  // Map model (default to sonnet)
-  // Valid models: sonnet, opus, haiku, opusplan, sonnet[1m]
-  sdkOptions.model = options.model || CLAUDE_MODELS.DEFAULT;
+  // Map model: only set when explicitly provided; let Claude Code CLI use its
+  // own settings.json when none is specified (supports CC switch scenarios).
+  if (options.model) {
+    sdkOptions.model = options.model;
+  }
   // Model logged at query start below
 
   // Map system prompt configuration

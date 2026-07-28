@@ -13,6 +13,8 @@
 export const CLAUDE_MODELS = {
   // Models in SDK format (what the actual SDK accepts)
   OPTIONS: [
+    { value: "deepseek-v4-pro", label: "DeepSeek V4 Pro" },
+    { value: "deepseek-v4-flash", label: "DeepSeek V4 Flash" },
     { value: "opus", label: "Opus" },
     { value: "sonnet", label: "Sonnet" },
     { value: "haiku", label: "Haiku" },
