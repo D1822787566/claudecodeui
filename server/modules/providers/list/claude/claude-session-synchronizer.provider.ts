@@ -8,6 +8,7 @@ import {
   buildLookupMap,
   extractFirstValidJsonlData,
   findFilesRecursivelyCreatedAfter,
+  normalizeProjectPath,
   normalizeSessionName,
   readFileTimestamps,
 } from '@/shared/utils.js';
@@ -39,28 +40,39 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
 
     let processed = 0;
 
-    // Collect all known project roots from the database so that sub-directory
-    // sessions (e.g. backend/, frontend/) can be merged into their parent project.
-    const knownRoots = projectsDb.getProjectPaths().map(r => r.project_path);
+    // Two-pass approach: first collect all normalized project paths from the
+    // scanned files so that sub-directory detection works even when the
+    // projects table is empty (e.g. after a clean restart).
+    const normalizedRoots = new Set<string>();
+    const parsedFiles: Array<{ filePath: string; parsed: ParsedSession }> = [];
 
     for (const filePath of files) {
-      // Skip subagent JSONL files stored inside .claude/worktrees directories
-      // (Claude Code's git worktree artifacts).
       if (filePath.includes('.claude/worktrees/')) {
         continue;
       }
-
       const parsed = await this.processSessionFile(filePath, nameMap);
       if (!parsed) {
         continue;
       }
+      parsedFiles.push({ filePath, parsed });
+      normalizedRoots.add(normalizeProjectPath(parsed.projectPath));
+    }
 
-      // If the session's projectPath is a sub-directory of a known project
-      // root, reassign it to the parent project.
-      let resolvedProjectPath = parsed.projectPath;
-      const lowerParsed = parsed.projectPath.toLowerCase();
+    // Also include existing project roots from the database.
+    for (const row of projectsDb.getProjectPaths()) {
+      normalizedRoots.add(normalizeProjectPath(row.project_path));
+    }
+
+    const knownRoots = [...normalizedRoots];
+
+    for (const { filePath, parsed } of parsedFiles) {
+      const normalizedPath = normalizeProjectPath(parsed.projectPath);
+      let resolvedProjectPath = normalizedPath;
+
+      // Merge sub-directory session into a known parent project root.
+      const lowerNormalized = normalizedPath.toLowerCase();
       for (const root of knownRoots) {
-        if (lowerParsed.startsWith(root.toLowerCase() + path.sep)) {
+        if (lowerNormalized.startsWith(root.toLowerCase() + path.sep)) {
           resolvedProjectPath = root;
           break;
         }
@@ -97,11 +109,12 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
     }
 
     // Merge sub-directory session into a known parent project root.
-    const knownRoots = projectsDb.getProjectPaths().map(r => r.project_path);
-    let resolvedProjectPath = parsed.projectPath;
-    const lowerParsed = parsed.projectPath.toLowerCase();
+    const knownRoots = projectsDb.getProjectPaths().map(r => normalizeProjectPath(r.project_path));
+    const normalizedPath = normalizeProjectPath(parsed.projectPath);
+    let resolvedProjectPath = normalizedPath;
+    const lowerNormalized = normalizedPath.toLowerCase();
     for (const root of knownRoots) {
-      if (lowerParsed.startsWith(root.toLowerCase() + path.sep)) {
+      if (lowerNormalized.startsWith(root.toLowerCase() + path.sep)) {
         resolvedProjectPath = root;
         break;
       }
