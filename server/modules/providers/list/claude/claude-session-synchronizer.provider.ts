@@ -38,6 +38,12 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
 
     let processed = 0;
     for (const filePath of files) {
+      // Skip subagent JSONL files stored inside .claude/worktrees directories
+      // (Claude Code's git worktree artifacts).
+      if (filePath.includes('.claude/worktrees/')) {
+        continue;
+      }
+
       const parsed = await this.processSessionFile(filePath, nameMap);
       if (!parsed) {
         continue;

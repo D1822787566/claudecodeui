@@ -39,6 +39,7 @@ const PROVIDER_WATCH_PATHS: Array<{ provider: LLMProvider; rootPath: string }> =
 const WATCHER_IGNORED_PATTERNS = [
   '**/node_modules/**',
   '**/.git/**',
+  '**/.claude/worktrees/**',
   '**/dist/**',
   '**/build/**',
   '**/*.tmp',
