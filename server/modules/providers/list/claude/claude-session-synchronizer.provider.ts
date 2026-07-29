@@ -165,12 +165,16 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
         const lastPrompt = typeof data.lastPrompt === 'string' ? data.lastPrompt : undefined;
         const claudeRenamedTitle = typeof data.customTitle === 'string' ? data.customTitle : undefined;
 
+        // Custom title (user-renamed) should take precedence over AI-generated titles
+        if (eventType === 'custom-title' && eventSessionId === sessionId && claudeRenamedTitle?.trim()) {
+          return claudeRenamedTitle;
+        }
+
         if (
           (eventType === 'ai-title' && eventSessionId === sessionId && aiTitle?.trim()) ||
-          (eventType === 'last-prompt' && eventSessionId === sessionId && lastPrompt?.trim()) ||
-          (eventType === "custom-title" && eventSessionId === sessionId && claudeRenamedTitle?.trim())
+          (eventType === 'last-prompt' && eventSessionId === sessionId && lastPrompt?.trim())
         ) {
-          return aiTitle || lastPrompt || claudeRenamedTitle;
+          return aiTitle || lastPrompt;
         }
       }
     } catch {

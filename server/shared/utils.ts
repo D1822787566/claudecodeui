@@ -190,11 +190,19 @@ export function normalizeProjectPath(inputPath: string): string {
 
   const parser = useWindowsPathRules ? path.win32 : path.posix;
   const root = parser.parse(normalized).root;
-  if (normalized === root) {
-    return normalized;
+
+  // On Windows, normalize drive letter to uppercase ("e:" -> "E:") so that
+  // paths originating from different shells or CLI invocations compare equal.
+  let result = normalized;
+  if (useWindowsPathRules && /^[a-z]:\\/i.test(result)) {
+    result = result.charAt(0).toUpperCase() + result.slice(1);
   }
 
-  return normalized.replace(/[\\/]+$/, '');
+  if (result === root) {
+    return result;
+  }
+
+  return result.replace(/[\\/]+$/, '');
 }
 
 /**
