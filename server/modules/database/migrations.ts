@@ -387,6 +387,23 @@ const ensureProjectsForSessionPaths = (db: Database): void => {
     return;
   }
 
+  // Normalize Windows drive letters to uppercase before inserting so that
+  // e:\ and E:\ don't become duplicate project entries.
+  if (process.platform === 'win32') {
+    db.exec(`
+      UPDATE sessions
+      SET project_path = UPPER(SUBSTR(project_path, 1, 1)) || SUBSTR(project_path, 2)
+      WHERE project_path GLOB '[a-z]:*'
+    `);
+  }
+
+  // Clean up any existing lowercase project entries in the projects table.
+  if (process.platform === 'win32') {
+    db.exec(`
+      DELETE FROM projects WHERE project_path GLOB '[a-z]:*'
+    `);
+  }
+
   db.exec(`
     INSERT INTO projects (project_id, project_path, custom_project_name, isStarred, isArchived)
     SELECT
