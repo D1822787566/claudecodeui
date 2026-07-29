@@ -2,6 +2,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 
+import { projectsDb } from '@/modules/database/index.js';
 import { sessionsDb } from '@/modules/database/index.js';
 import {
   buildLookupMap,
@@ -37,6 +38,11 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
     );
 
     let processed = 0;
+
+    // Collect all known project roots from the database so that sub-directory
+    // sessions (e.g. backend/, frontend/) can be merged into their parent project.
+    const knownRoots = projectsDb.getProjectPaths().map(r => r.project_path);
+
     for (const filePath of files) {
       // Skip subagent JSONL files stored inside .claude/worktrees directories
       // (Claude Code's git worktree artifacts).
@@ -49,11 +55,22 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
         continue;
       }
 
+      // If the session's projectPath is a sub-directory of a known project
+      // root, reassign it to the parent project.
+      let resolvedProjectPath = parsed.projectPath;
+      const lowerParsed = parsed.projectPath.toLowerCase();
+      for (const root of knownRoots) {
+        if (lowerParsed.startsWith(root.toLowerCase() + path.sep)) {
+          resolvedProjectPath = root;
+          break;
+        }
+      }
+
       const timestamps = await readFileTimestamps(filePath);
       sessionsDb.createSession(
         parsed.sessionId,
         this.provider,
-        parsed.projectPath,
+        resolvedProjectPath,
         parsed.sessionName,
         timestamps.createdAt,
         timestamps.updatedAt,
@@ -79,11 +96,22 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
       return null;
     }
 
+    // Merge sub-directory session into a known parent project root.
+    const knownRoots = projectsDb.getProjectPaths().map(r => r.project_path);
+    let resolvedProjectPath = parsed.projectPath;
+    const lowerParsed = parsed.projectPath.toLowerCase();
+    for (const root of knownRoots) {
+      if (lowerParsed.startsWith(root.toLowerCase() + path.sep)) {
+        resolvedProjectPath = root;
+        break;
+      }
+    }
+
     const timestamps = await readFileTimestamps(filePath);
     return sessionsDb.createSession(
       parsed.sessionId,
       this.provider,
-      parsed.projectPath,
+      resolvedProjectPath,
       parsed.sessionName,
       timestamps.createdAt,
       timestamps.updatedAt,
