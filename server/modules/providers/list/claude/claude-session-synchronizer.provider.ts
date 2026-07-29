@@ -67,7 +67,10 @@ export class ClaudeSessionSynchronizer implements IProviderSessionSynchronizer {
 
     for (const { filePath, parsed } of parsedFiles) {
       const normalizedPath = normalizeProjectPath(parsed.projectPath);
-      let resolvedProjectPath = normalizedPath;
+      // Force Windows drive letter to uppercase — final guarantee.
+      let resolvedProjectPath = /^[a-z]:\\/.test(normalizedPath)
+        ? normalizedPath.charAt(0).toUpperCase() + normalizedPath.slice(1)
+        : normalizedPath;
 
       // Merge sub-directory session into a known parent project root.
       const lowerNormalized = normalizedPath.toLowerCase();
