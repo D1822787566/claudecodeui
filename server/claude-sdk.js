@@ -26,6 +26,7 @@ import {
   notifyUserIfEnabled
 } from './services/notification-orchestrator.js';
 import { sessionsService } from './modules/providers/services/sessions.service.js';
+import { sessionsDb } from './modules/database/index.js';
 import { providerAuthService } from './modules/providers/services/provider-auth.service.js';
 import { createNormalizedMessage } from './shared/utils.js';
 
@@ -651,6 +652,23 @@ async function queryClaudeSDK(command, options = {}, ws) {
         // Set session ID on writer
         if (ws.setSessionId && typeof ws.setSessionId === 'function') {
           ws.setSessionId(capturedSessionId);
+        }
+
+        // Persist the new session to DB immediately, so it appears in the
+        // sidebar without waiting for the filesystem watcher to pick up the
+        // JSONL (which can take 6+ seconds on chokidar polling).
+        try {
+          sessionsDb.createSession(
+            capturedSessionId,
+            'claude',
+            options.cwd || process.cwd(),
+            undefined,
+            new Date().toISOString(),
+            new Date().toISOString(),
+            null
+          );
+        } catch (err) {
+          console.warn('Failed to persist new session to DB:', err.message);
         }
 
         // Send session-created event only once for new sessions
