@@ -387,8 +387,34 @@ const ensureProjectsForSessionPaths = (db: Database): void => {
     return;
   }
 
-  // Normalize Windows drive letters to uppercase before inserting so that
-  // e:\ and E:\ don't become duplicate project entries.
+  // Create a trigger that automatically uppercases Windows drive letters
+  // on any INSERT or UPDATE to sessions.project_path. This is the definitive
+  // fix for case-duplicate projects — regardless of which code path writes
+  // the value, the DB itself guarantees consistency.
+  if (process.platform === 'win32') {
+    db.exec(`
+      DROP TRIGGER IF EXISTS trg_sessions_uppercase_drive;
+      CREATE TRIGGER trg_sessions_uppercase_drive
+      AFTER INSERT ON sessions
+      WHEN NEW.project_path GLOB '[a-z]:*'
+      BEGIN
+        UPDATE sessions
+        SET project_path = UPPER(SUBSTR(NEW.project_path, 1, 1)) || SUBSTR(NEW.project_path, 2)
+        WHERE session_id = NEW.session_id;
+      END;
+
+      CREATE TRIGGER IF NOT EXISTS trg_sessions_uppercase_drive_update
+      AFTER UPDATE ON sessions
+      WHEN NEW.project_path GLOB '[a-z]:*'
+      BEGIN
+        UPDATE sessions
+        SET project_path = UPPER(SUBSTR(NEW.project_path, 1, 1)) || SUBSTR(NEW.project_path, 2)
+        WHERE session_id = NEW.session_id;
+      END;
+    `);
+  }
+
+  // Normalize any existing lowercase paths (legacy data).
   if (process.platform === 'win32') {
     db.exec(`
       UPDATE sessions
