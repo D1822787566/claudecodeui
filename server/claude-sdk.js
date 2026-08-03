@@ -654,19 +654,23 @@ async function queryClaudeSDK(command, options = {}, ws) {
           ws.setSessionId(capturedSessionId);
         }
 
-        // Persist the new session to DB immediately, so it appears in the
-        // sidebar without waiting for the filesystem watcher to pick up the
-        // JSONL (which can take 6+ seconds on chokidar polling).
+        // Immediately register the session so it appears in the sidebar.
+        // Only create if it doesn't already exist — the filesystem watcher
+        // may have already picked up the JSONL and created a row with the
+        // correct jsonl_path; we must not overwrite that.
         try {
-          sessionsDb.createSession(
-            capturedSessionId,
-            'claude',
-            options.cwd || process.cwd(),
-            undefined,
-            new Date().toISOString(),
-            new Date().toISOString(),
-            null
-          );
+          const existing = sessionsDb.getSessionById ? sessionsDb.getSessionById(capturedSessionId) : null;
+          if (!existing) {
+            sessionsDb.createSession(
+              capturedSessionId,
+              'claude',
+              options.cwd || process.cwd(),
+              undefined,
+              new Date().toISOString(),
+              new Date().toISOString(),
+              null
+            );
+          }
         } catch (err) {
           console.warn('Failed to persist new session to DB:', err.message);
         }
