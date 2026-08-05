@@ -16,6 +16,13 @@ const PROVIDER_WATCH_PATHS: Array<{ provider: LLMProvider; rootPath: string }> =
     provider: 'claude',
     rootPath: path.join(os.homedir(), '.claude', 'projects'),
   },
+  // When CLAUDE_CONFIG_DIR is set (e.g. by a parent SDK like Proma),
+  // Claude Code CLI writes JSONL there instead of ~/.claude/projects/.
+  // Watch that directory too so sessions are discovered regardless.
+  ...(process.env.CLAUDE_CONFIG_DIR ? [{
+    provider: 'claude' as LLMProvider,
+    rootPath: path.join(process.env.CLAUDE_CONFIG_DIR, 'projects'),
+  }] : []),
   {
     provider: 'cursor',
     rootPath: path.join(os.homedir(), '.cursor', 'projects'),
